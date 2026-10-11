@@ -1298,7 +1298,7 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 if WindUI then
     local Window = WindUI:CreateWindow({
         Title = "Drak Hub Painel",
-        Icon = "shield",
+        Icon = "shield-user",
         Author = "by: Gagadev amd ricknz",
         Folder = "DrakHub",
         Size = UDim2.fromOffset(580, 460),
@@ -1315,17 +1315,6 @@ if WindUI then
         User = { Enabled = true, Anonymous = false, Callback = function() print("Perfil clicado!") end },
     })
 
-Tab:Tag({
-    Title = "Admin",
-    Color = Color3.fromRGB(100, 200, 100)
-})
-
-WindUI:Notify({
-    Title = "Concluído",
-    Content = "painel aberto",
-    Icon = "shield-user", -- lucide icon or "rbxassetid://". optional
-    Duration = 3, -- time in seconds. optional
-})
     local function getPlayersList()
         local t = {}
         for _, p in ipairs(Players:GetPlayers()) do table.insert(t, p.Name) end
