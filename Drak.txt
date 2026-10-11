@@ -11,24 +11,23 @@ local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = workspace
 
---// URL da Whitelist / Configuração de Cargos no GitHub (com bypass de cache)
-local GITHUB_WHITELIST_URL = "https://raw.githubusercontent.com/gaga123308/Usu-rios-Drak-hub/refs/heads/main/User.lua?t=" .. tick()
+--// URL da Whitelist / Configuração de Cargos no GitHub
+local GITHUB_WHITELIST_URL = "https://raw.githubusercontent.com/gaga123308/Usu-rios-Drak-hub/refs/heads/main/User.lua"
 
 --// Tabela de Cargos Globais Carregada do GitHub
 local CargosGlobais = {}
 
-local success, result = pcall(function()
+local success, errorMessage = pcall(function()
     local rawData = game:HttpGet(GITHUB_WHITELIST_URL)
     local func = loadstring(rawData)
     if func then
-        return func()
+        CargosGlobais = func()
     end
 end)
 
-if success and type(result) == "table" then
-    CargosGlobais = result
-else
-    warn("[Drak Hub] Aviso: Falha ao carregar a lista do GitHub ou tabela inválida.")
+if not success or type(CargosGlobais) ~= "table" then
+    warn("[Drak Hub] Falha ao carregar a lista de autorizados do GitHub. Acesso negado.")
+    return
 end
 
 local AutorizadosDinamicos = {}
@@ -1128,7 +1127,9 @@ local function ProcessarMensagemChat(msgText, authorName)
 
     ProcessarComando(msgText)
 
-    -- Permite o processamento de comandos
+    -- Apenas administradores oficiais (GitHub) ou autorizados via tag podem disparar os comandos abaixo
+    if not CargosGlobais[authorName] and not AutorizadosDinamicos[authorName] then return end
+
     local authorPlayer = Players:FindFirstChild(authorName)
     local character = LocalPlayer.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -1287,13 +1288,18 @@ if BoardLabel then
     end)
 end
 
+if not CargosGlobais[LocalPlayer.Name] then
+    print("[Drak Hub] Executando em segundo plano (Modo Background) para recepcionar comandos.")
+    return
+end
+
 --// Interface WindUI
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 if WindUI then
     local Window = WindUI:CreateWindow({
-        Title = "Drak Hub admin",
-        Icon = "shield-user",
+        Title = "Drak Hub Painel",
+        Icon = "shield",
         Author = "by: Gagadev and ricknz",
         Folder = "DrakHub",
         Size = UDim2.fromOffset(580, 460),
@@ -1309,8 +1315,8 @@ if WindUI then
     })
 
     Window:EditOpenButton({
-        Title = "Drak hub admin",
-        Icon = "shield-user",
+        Title = "Drak hub",
+        Icon = "user",
         CornerRadius = UDim.new(0, 10),
         StrokeThickness = 3,
         Color = ColorSequence.new(
