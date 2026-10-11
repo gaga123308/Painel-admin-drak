@@ -1298,8 +1298,8 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 if WindUI then
     local Window = WindUI:CreateWindow({
         Title = "Drak Hub Painel",
-        Icon = "door-open",
-        Author = "by: Gagadev and 7812 and Pietro",
+        Icon = "shield",
+        Author = "by: Gagadev amd ricknz",
         Folder = "DrakHub",
         Size = UDim2.fromOffset(580, 460),
         MinSize = Vector2.new(560, 350),
@@ -1311,10 +1311,21 @@ if WindUI then
         HideSearchBar = true,
         ScrollBarEnabled = false,
         BackgroundImageTransparency = 0.42,
-        Background = "rbxassetid://87070337448815",
+        Background = "rbxassetid://",
         User = { Enabled = true, Anonymous = false, Callback = function() print("Perfil clicado!") end },
     })
 
+Tab:Tag({
+    Title = "Admin",
+    Color = Color3.fromRGB(100, 200, 100)
+})
+
+WindUI:Notify({
+    Title = "Concluído",
+    Content = "painel aberto",
+    Icon = "shield-user", -- lucide icon or "rbxassetid://". optional
+    Duration = 3, -- time in seconds. optional
+})
     local function getPlayersList()
         local t = {}
         for _, p in ipairs(Players:GetPlayers()) do table.insert(t, p.Name) end
@@ -1333,7 +1344,7 @@ if WindUI then
         Callback = function(opt) TargetName = opt end
     })
 
-    local comandos = { "kick", "kill", "killplus", "fling", "freeze", "unfreeze", "bring", "tp", "float", "jail", "unjail", "backrooms", "verifique" }
+    local comandos = { "kick", "kill", "killplus", "fling", "freeze", "unfreeze", "bring", "tp", "float", "jail", "unjail", "verifique" }
     for _, cmd in ipairs(comandos) do
         SectionComandos:Button({
             Title = cmd:lower(),
